@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Passenger Login — BusTrack</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #080c14; --surface: #0f1520; --card: #141b2a; --border: #1e2a40;
+      --accent: #00d4ff; --text: #e8eef8; --muted: #6b7c99; --green: #10b981; --red: #ef4444;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    
+    .bg-glow {
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(0,212,255,0.1) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .container { position: relative; z-index: 1; width: 100%; max-width: 440px; padding: 24px; }
+
+    .logo-link { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); margin-bottom: 40px; justify-content: center; }
+    .logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, var(--accent), #0099bb); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .logo-text { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+    .logo-text span { color: var(--accent); }
+
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 40px; 
+      box-shadow: 0 40px 80px rgba(0,0,0,0.4);
+    }
+
+    .tabs { display: flex; background: var(--surface); border-radius: 10px; padding: 4px; margin-bottom: 32px; }
+    .tab {
+      flex: 1; padding: 10px; border: none; background: none;
+      color: var(--muted); font-size: 14px; font-weight: 500; cursor: pointer;
+      border-radius: 7px; transition: all 0.2s; font-family: 'Inter', sans-serif;
+    }
+    .tab.active { background: var(--accent); color: #000; font-weight: 600; }
+
+    h2 { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+
+    .field { margin-bottom: 18px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; }
+    
+    .input-wrap { position: relative; }
+    .input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 16px; }
+    
+    input {
+      width: 100%; padding: 13px 14px 13px 42px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: 15px;
+      font-family: 'Inter', sans-serif;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,212,255,0.1); }
+    input::placeholder { color: var(--muted); }
+
+    .btn-submit {
+      width: 100%; padding: 14px; background: linear-gradient(135deg, var(--accent), #0099bb);
+      color: #000; border: none; border-radius: 10px; font-size: 16px; font-weight: 700;
+      cursor: pointer; margin-top: 8px; transition: all 0.2s; font-family: 'Inter', sans-serif;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,212,255,0.3); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .divider { text-align: center; color: var(--muted); font-size: 12px; margin: 20px 0; position: relative; }
+    .divider::before, .divider::after { content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--border); }
+    .divider::before { left: 0; } .divider::after { right: 0; }
+
+    .quick-track {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px; border: 1px solid var(--border); border-radius: 10px;
+      color: var(--muted); font-size: 14px; text-decoration: none;
+      transition: all 0.2s;
+    }
+    .quick-track:hover { border-color: var(--accent); color: var(--accent); }
+
+    .alert {
+      padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;
+      display: none;
+    }
+    .alert.error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: #f87171; }
+    .alert.success { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); color: #34d399; }
+    .alert.show { display: block; }
+
+    .back-link {
+      display: block; text-align: center; margin-top: 20px;
+      color: var(--muted); font-size: 13px; text-decoration: none;
+    }
+    .back-link:hover { color: var(--text); }
+
+    .spinner { width: 18px; height: 18px; border: 2px solid rgba(0,0,0,0.3); border-top-color: #000; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="bg-glow"></div>
+  <div class="container">
+    <a href="../index.html" class="logo-link">
+      <div class="logo-icon">🚌</div>
+      <div class="logo-text">Bus<span>Track</span></div>
+    </a>
+
+    <div class="card">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('login')">Sign In</button>
+        <button class="tab" onclick="switchTab('register')">Create Account</button>
+      </div>
+
+      <!-- Login Form -->
+      <div id="loginForm">
+        <h2>Welcome back</h2>
+        <p class="subtitle">Sign in to track your bus</p>
+        <div id="loginAlert" class="alert"></div>
+        
+        <div class="field">
+          <label>Email Address</label>
+          <div class="input-wrap">
+            <span class="input-icon">📧</span>
+            <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email">
+          </div>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+          </div>
+        </div>
+        <button class="btn-submit" id="loginBtn" onclick="doLogin()">
+          Sign In →
+        </button>
+
+        <div class="divider">or</div>
+        <a href="track.html" class="quick-track">📍 Quick Track (No Login Required)</a>
+      </div>
+
+      <!-- Register Form -->
+      <div id="registerForm" style="display:none;">
+        <h2>Create Account</h2>
+        <p class="subtitle">Join BusTrack as a passenger</p>
+        <div id="regAlert" class="alert"></div>
+
+        <div class="field">
+          <label>Full Name</label>
+          <div class="input-wrap">
+            <span class="input-icon">👤</span>
+            <input type="text" id="regName" placeholder="Your full name">
+          </div>
+        </div>
+        <div class="field">
+          <label>Email Address</label>
+          <div class="input-wrap">
+            <span class="input-icon">📧</span>
+            <input type="email" id="regEmail" placeholder="you@example.com">
+          </div>
+        </div>
+        <div class="field">
+          <label>Phone Number</label>
+          <div class="input-wrap">
+            <span class="input-icon">📱</span>
+            <input type="tel" id="regPhone" placeholder="10-digit mobile number">
+          </div>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="regPass" placeholder="Min. 6 characters">
+          </div>
+        </div>
+        <button class="btn-submit" id="regBtn" onclick="doRegister()">
+          Create Account →
+        </button>
+      </div>
+    </div>
+
+    <a href="../index.html" class="back-link">← Back to Home</a>
+  </div>
+
+  <script src="../shared/config.js"></script>
+  <script>
+    // Check if already logged in
+    if (BT_Storage.get('token') && BT_Storage.get('role') === 'user') {
+      window.location.href = 'dashboard.html';
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', (i === 0) === (tab === 'login')));
+      document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+      document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+    }
+
+    function showAlert(id, msg, type) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.className = 'alert ' + type + ' show';
+    }
+
+    async function doLogin() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPass').value;
+      if (!email || !password) return showAlert('loginAlert', 'Please fill in all fields', 'error');
+      
+      const btn = document.getElementById('loginBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner"></div> Signing in...';
+
+      try {
+        const data = await btFetch('/user/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+        BT_Storage.set('token', data.token);
+        BT_Storage.set('user', data.user);
+        BT_Storage.set('role', 'user');
+        showAlert('loginAlert', 'Login successful! Redirecting...', 'success');
+        setTimeout(() => window.location.href = 'dashboard.html', 800);
+      } catch (e) {
+        showAlert('loginAlert', e.message || 'Invalid credentials', 'error');
+        btn.disabled = false;
+        btn.innerHTML = 'Sign In →';
+      }
+    }
+
+    async function doRegister() {
+      const name = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const phone = document.getElementById('regPhone').value.trim();
+      const password = document.getElementById('regPass').value;
+
+      if (!name || !email || !phone || !password)
+        return showAlert('regAlert', 'Please fill in all fields', 'error');
+      if (password.length < 6)
+        return showAlert('regAlert', 'Password must be at least 6 characters', 'error');
+
+      const btn = document.getElementById('regBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner"></div> Creating account...';
+
+      try {
+        const data = await btFetch('/user/register', { method: 'POST', body: JSON.stringify({ name, email, phone, password }) });
+        BT_Storage.set('token', data.token);
+        BT_Storage.set('user', data.user);
+        BT_Storage.set('role', 'user');
+        showAlert('regAlert', 'Account created! Redirecting...', 'success');
+        setTimeout(() => window.location.href = 'dashboard.html', 800);
+      } catch (e) {
+        showAlert('regAlert', e.message || 'Registration failed', 'error');
+        btn.disabled = false;
+        btn.innerHTML = 'Create Account →';
+      }
+    }
+
+    // Enter key support
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const loginVisible = document.getElementById('loginForm').style.display !== 'none';
+        loginVisible ? doLogin() : doRegister();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BusTrack — Real-Time Bus Tracking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080c14;
+      --surface: #0f1520;
+      --card: #141b2a;
+      --border: #1e2a40;
+      --accent: #00d4ff;
+      --accent2: #7c3aed;
+      --accent3: #f59e0b;
+      --text: #e8eef8;
+      --muted: #6b7c99;
+      --green: #10b981;
+      --red: #ef4444;
+    }
+
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; overflow-x: hidden; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-bg {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,212,255,0.12) 0%, transparent 60%),
+                  radial-gradient(ellipse 50% 40% at 80% 80%, rgba(124,58,237,0.1) 0%, transparent 50%);
+    }
+
+    .grid-overlay {
+      position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* Moving bus dots animation */
+    .bus-trail {
+      position: absolute;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .bus-dot {
+      position: absolute;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent), 0 0 24px rgba(0,212,255,0.4);
+      animation: moveDot linear infinite;
+    }
+
+    @keyframes moveDot {
+      0% { transform: translateX(-20px); opacity: 0; }
+      5% { opacity: 1; }
+      95% { opacity: 1; }
+      100% { transform: translateX(calc(100vw + 20px)); opacity: 0; }
+    }
+
+    /* NAV */
+    nav {
+      position: relative; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 24px 48px;
+    }
+
+    .logo {
+      display: flex; align-items: center; gap: 12px;
+      font-family: 'Syne', sans-serif;
+      font-size: 24px; font-weight: 800;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+
+    .logo span { color: var(--accent); }
+
+    .nav-links { display: flex; gap: 8px; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 22px; border-radius: 8px;
+      font-size: 14px; font-weight: 500; cursor: pointer;
+      text-decoration: none; border: none; transition: all 0.2s;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); border-color: var(--accent); background: rgba(0,212,255,0.05); }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), #0099bb); color: #000; font-weight: 600; }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,212,255,0.3); }
+    .btn-driver { background: linear-gradient(135deg, var(--accent2), #5b21b6); color: #fff; font-weight: 600; }
+    .btn-driver:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,58,237,0.3); }
+
+    /* HERO CONTENT */
+    .hero-content {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 40px 24px;
+      position: relative; z-index: 5;
+    }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.2);
+      color: var(--accent); border-radius: 100px;
+      padding: 6px 16px; font-size: 12px; font-weight: 500;
+      margin-bottom: 32px;
+      animation: fadeInUp 0.6s ease both;
+    }
+
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+
+    @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(1.4); } }
+    @keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(48px, 8vw, 96px);
+      font-weight: 800;
+      line-height: 1.0;
+      letter-spacing: -0.02em;
+      margin-bottom: 24px;
+      animation: fadeInUp 0.6s 0.1s ease both;
+    }
+
+    h1 .highlight {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: 18px; color: var(--muted); max-width: 500px; line-height: 1.7;
+      margin-bottom: 48px;
+      animation: fadeInUp 0.6s 0.2s ease both;
+    }
+
+    .hero-actions {
+      display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+      margin-bottom: 64px;
+      animation: fadeInUp 0.6s 0.3s ease both;
+    }
+
+    .hero-actions .btn { padding: 14px 32px; font-size: 16px; border-radius: 10px; }
+
+    /* CARDS SECTION */
+    .cards-section {
+      padding: 80px 48px;
+      position: relative; z-index: 5;
+    }
+
+    .section-title {
+      text-align: center;
+      font-family: 'Syne', sans-serif;
+      font-size: 36px; font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .section-sub { text-align: center; color: var(--muted); margin-bottom: 48px; }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      max-width: 1100px; margin: 0 auto;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      transition: all 0.3s;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(0,212,255,0.08);
+    }
+
+    .card.driver-card:hover { border-color: var(--accent2); box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(124,58,237,0.08); }
+    .card.admin-card:hover { border-color: var(--accent3); box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(245,158,11,0.08); }
+
+    .card-icon {
+      width: 56px; height: 56px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; margin-bottom: 20px;
+    }
+
+    .card-icon.blue { background: rgba(0,212,255,0.12); }
+    .card-icon.purple { background: rgba(124,58,237,0.12); }
+    .card-icon.amber { background: rgba(245,158,11,0.12); }
+
+    .card h3 {
+      font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .card p { color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+
+    .card-link {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 600; color: var(--accent);
+    }
+
+    .driver-card .card-link { color: var(--accent2); }
+    .admin-card .card-link { color: var(--accent3); }
+
+    /* STATS */
+    .stats-bar {
+      display: flex; gap: 40px; justify-content: center; flex-wrap: wrap;
+      padding: 40px 48px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat { text-align: center; }
+    .stat-num {
+      font-family: 'Syne', sans-serif;
+      font-size: 36px; font-weight: 800; color: var(--accent);
+      display: block;
+    }
+    .stat-label { color: var(--muted); font-size: 13px; }
+
+    /* FEATURES */
+    .features { padding: 80px 48px; max-width: 1100px; margin: 0 auto; }
+
+    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; }
+
+    .feature {
+      display: flex; gap: 16px; align-items: flex-start;
+    }
+
+    .feature-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+
+    .feature h4 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .feature p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+    /* FOOTER */
+    footer {
+      text-align: center; padding: 32px;
+      border-top: 1px solid var(--border);
+      color: var(--muted); font-size: 13px;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      nav { padding: 16px 20px; }
+      .nav-links .btn-ghost { display: none; }
+      .cards-section, .features, .stats-bar { padding: 40px 20px; }
+    }
+
+    /* Live indicator */
+    .live-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2);
+      color: var(--green); border-radius: 6px; padding: 4px 10px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+    }
+    .live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: pulse 1.5s infinite; }
+  </style>
+</head>
+<body>
+
+  <div class="hero">
+    <div class="hero-bg"></div>
+    <div class="grid-overlay"></div>
+    <div class="bus-trail" id="busTrail"></div>
+
+    <nav>
+      <a href="index.html" class="logo">
+        <div class="logo-icon">🚌</div>
+        Bus<span>Track</span>
+      </a>
+      <div class="nav-links">
+        <a href="user/login.html" class="btn btn-ghost">Passenger Login</a>
+        <a href="driver/login.html" class="btn btn-driver">Driver Portal</a>
+      </div>
+    </nav>
+
+    <div class="hero-content">
+      <div class="badge">
+        <span class="badge-dot"></span>
+        Live GPS Tracking System
+      </div>
+
+      <h1>
+        Track Your<br>
+        <span class="highlight">Bus in Real Time</span>
+      </h1>
+
+      <p class="hero-sub">
+        Know exactly where your bus is, right now. Drivers share live GPS, 
+        passengers track effortlessly. Never miss your bus again.
+      </p>
+
+      <div class="hero-actions">
+        <a href="user/login.html" class="btn btn-primary">
+          🗺️ Track a Bus
+        </a>
+        <a href="driver/login.html" class="btn btn-driver">
+          🚌 Driver Portal
+        </a>
+      </div>
+
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        LIVE TRACKING ACTIVE
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat">
+      <span class="stat-num" id="activeBuses">0</span>
+      <span class="stat-label">Active Buses</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num">50+</span>
+      <span class="stat-label">Routes Covered</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num">99.9%</span>
+      <span class="stat-label">Uptime</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num">&lt;2s</span>
+      <span class="stat-label">Update Interval</span>
+    </div>
+  </div>
+
+  <!-- Cards Section -->
+  <section class="cards-section">
+    <h2 class="section-title">Choose Your Portal</h2>
+    <p class="section-sub">One platform for passengers and drivers</p>
+
+    <div class="cards-grid">
+      <a href="user/login.html" class="card">
+        <div class="card-icon blue">🗺️</div>
+        <h3>Passenger Portal</h3>
+        <p>Track any bus in real-time on an interactive map. Get live updates, ETA, and route information.</p>
+        <div class="card-link">Get Started →</div>
+      </a>
+
+      <a href="driver/login.html" class="card driver-card">
+        <div class="card-icon purple">🚌</div>
+        <h3>Driver Portal</h3>
+        <p>Share your live GPS location with passengers. Start and stop tracking with one tap.</p>
+        <div class="card-link">Driver Login →</div>
+      </a>
+
+      <a href="user/track.html" class="card admin-card">
+        <div class="card-icon amber">📍</div>
+        <h3>Quick Track</h3>
+        <p>Enter a driver's phone number to instantly track their bus without signing in.</p>
+        <div class="card-link">Track Now →</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features">
+    <h2 class="section-title" style="margin-bottom:48px;">Everything You Need</h2>
+    <div class="feature-grid">
+      <div class="feature">
+        <div class="feature-icon">📡</div>
+        <div>
+          <h4>Real-Time GPS</h4>
+          <p>Location updates every 2 seconds via WebSocket connection.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔐</div>
+        <div>
+          <h4>Secure Auth</h4>
+          <p>JWT-based login for both drivers and passengers.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📱</div>
+        <div>
+          <h4>Mobile Ready</h4>
+          <p>Drivers use their phone GPS — no extra hardware needed.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🗺️</div>
+        <div>
+          <h4>Interactive Map</h4>
+          <p>OpenStreetMap powered with smooth animations and bus markers.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔔</div>
+        <div>
+          <h4>Live Status</h4>
+          <p>Instantly know when a bus goes online or offline.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🚏</div>
+        <div>
+          <h4>Route Info</h4>
+          <p>View all stops along a route and estimated arrival times.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>© 2024 BusTrack — Real-Time Bus Tracking Platform &nbsp;|&nbsp; Built with ❤️ for commuters</p>
+  </footer>
+
+  <script>
+    // Animate bus dots across the screen
+    const trail = document.getElementById('busTrail');
+    function createDot() {
+      const dot = document.createElement('div');
+      dot.className = 'bus-dot';
+      dot.style.top = Math.random() * 100 + '%';
+      dot.style.animationDuration = (8 + Math.random() * 12) + 's';
+      dot.style.animationDelay = (Math.random() * 5) + 's';
+      dot.style.opacity = Math.random() * 0.6 + 0.2;
+      trail.appendChild(dot);
+      setTimeout(() => dot.remove(), 20000);
+    }
+
+    for (let i = 0; i < 8; i++) setTimeout(createDot, i * 1000);
+    setInterval(createDot, 2000);
+
+    // Fetch active buses count
+    async function fetchStats() {
+      try {
+        const res = await fetch('http://localhost:3001/api/active-buses');
+        const data = await res.json();
+        document.getElementById('activeBuses').textContent = data.length;
+      } catch {}
+    }
+    fetchStats();
+    setInterval(fetchStats, 5000);
+  </script>
+</body>
+</html>

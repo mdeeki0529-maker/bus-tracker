@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — BusTrack</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #080c14; --surface: #0f1520; --card: #141b2a; --border: #1e2a40;
+      --accent: #00d4ff; --accent2: #7c3aed; --text: #e8eef8; --muted: #6b7c99;
+      --green: #10b981; --red: #ef4444; --amber: #f59e0b;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; height: 100vh; display: flex; flex-direction: column; }
+
+    /* TOPBAR */
+    .topbar {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; height: 60px; flex-shrink: 0;
+    }
+    .logo { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
+    .logo span { color: var(--accent); }
+    .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), #0099bb); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+
+    .user-info { display: flex; align-items: center; gap: 12px; }
+    .avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #000; }
+    .user-name { font-size: 14px; font-weight: 500; }
+    .btn-logout { background: none; border: 1px solid var(--border); color: var(--muted); padding: 6px 14px; border-radius: 7px; cursor: pointer; font-size: 13px; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+    .btn-logout:hover { border-color: var(--red); color: var(--red); }
+
+    /* LAYOUT */
+    .layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 340px; background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
+    }
+
+    .sidebar-header { padding: 20px 20px 12px; border-bottom: 1px solid var(--border); }
+    .sidebar-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+
+    .search-box {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px;
+    }
+    .search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 14px; outline: none; font-family: 'Inter', sans-serif; }
+    .search-box input::placeholder { color: var(--muted); }
+
+    /* TRACK BY PHONE */
+    .phone-track {
+      padding: 12px 20px; border-bottom: 1px solid var(--border);
+    }
+    .phone-track label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .phone-row { display: flex; gap: 8px; }
+    .phone-input {
+      flex: 1; padding: 9px 12px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 14px; outline: none; font-family: 'Inter', sans-serif;
+      transition: border-color 0.2s;
+    }
+    .phone-input:focus { border-color: var(--accent); }
+    .btn-track {
+      padding: 9px 16px; background: var(--accent); color: #000; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s; font-family: 'Inter', sans-serif;
+    }
+    .btn-track:hover { box-shadow: 0 4px 12px rgba(0,212,255,0.3); }
+
+    /* BUS LIST */
+    .bus-list { flex: 1; overflow-y: auto; padding: 12px; }
+    .bus-list::-webkit-scrollbar { width: 4px; }
+    .bus-list::-webkit-scrollbar-track { background: transparent; }
+    .bus-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .bus-item {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s;
+    }
+    .bus-item:hover { border-color: var(--accent); background: rgba(0,212,255,0.03); }
+    .bus-item.selected { border-color: var(--accent); background: rgba(0,212,255,0.05); }
+
+    .bus-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .bus-id { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; }
+    
+    .status-dot {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 600;
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .dot.live { background: var(--green); animation: pulse 1.5s infinite; box-shadow: 0 0 6px var(--green); }
+    .dot.offline { background: var(--muted); }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+    .bus-route { font-size: 12px; color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bus-driver { font-size: 12px; color: var(--text); }
+    .bus-number { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: 'Syne', sans-serif; }
+
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+
+    /* MAP AREA */
+    .map-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    .map-topbar {
+      padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .selected-bus-info { display: flex; flex-direction: column; gap: 2px; }
+    .selected-bus-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px; }
+    .selected-bus-route { font-size: 12px; color: var(--muted); }
+
+    .map-actions { display: flex; gap: 8px; }
+    .btn-sm {
+      padding: 7px 14px; border-radius: 7px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--muted);
+      transition: all 0.2s; font-family: 'Inter', sans-serif;
+    }
+    .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-sm.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+    #map { flex: 1; }
+
+    /* BUS DETAIL PANEL */
+    .detail-panel {
+      position: absolute; bottom: 24px; left: 360px; right: 24px;
+      max-width: 460px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+      padding: 20px; z-index: 1000;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      display: none;
+    }
+    .detail-panel.show { display: block; }
+    .detail-close { position: absolute; top: 14px; right: 14px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; }
+
+    .detail-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .detail-bus-icon { width: 44px; height: 44px; background: rgba(0,212,255,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .detail-bus-name { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; }
+    .detail-bus-route { font-size: 12px; color: var(--muted); }
+
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .detail-item { background: var(--surface); border-radius: 8px; padding: 10px 12px; }
+    .detail-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .detail-value { font-size: 14px; font-weight: 600; }
+
+    .stops-list { margin-top: 14px; }
+    .stop-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .stop-item:last-child { border-bottom: none; }
+    .stop-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+    .stop-dot.first, .stop-dot.last { background: var(--accent); }
+
+    .no-location { text-align: center; padding: 12px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px; color: var(--amber); font-size: 13px; margin-top: 12px; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .sidebar { width: 100%; position: absolute; bottom: 0; top: 60px; transform: translateX(-100%); z-index: 500; transition: transform 0.3s; }
+      .sidebar.open { transform: translateX(0); }
+      .map-area { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="../index.html" class="logo">
+      <div class="logo-icon">🚌</div>
+      Bus<span>Track</span>
+    </a>
+    <div class="user-info">
+      <div class="avatar" id="userAvatar">U</div>
+      <span class="user-name" id="userName">Loading...</span>
+      <button class="btn-logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">🚌 Live Buses</div>
+        <div class="search-box">
+          <span>🔍</span>
+          <input type="text" id="searchInput" placeholder="Search route or bus..." oninput="filterBuses()">
+        </div>
+      </div>
+
+      <div class="phone-track">
+        <label>Track by Driver Phone</label>
+        <div class="phone-row">
+          <input class="phone-input" type="tel" id="phoneInput" placeholder="Enter phone number...">
+          <button class="btn-track" onclick="trackByPhone()">Track</button>
+        </div>
+      </div>
+
+      <div class="bus-list" id="busList">
+        <div class="empty-state">
+          <div class="icon">🔄</div>
+          <p>Loading buses...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div class="map-area" style="position:relative;">
+      <div class="map-topbar">
+        <div class="selected-bus-info">
+          <div class="selected-bus-name" id="mapBusName">All Active Buses</div>
+          <div class="selected-bus-route" id="mapBusRoute">Select a bus to track</div>
+        </div>
+        <div class="map-actions">
+          <button class="btn-sm" onclick="recenter()">📍 Recenter</button>
+          <button class="btn-sm" id="followBtn" onclick="toggleFollow()">👁️ Follow</button>
+        </div>
+      </div>
+      <div id="map"></div>
+
+      <!-- Detail Panel -->
+      <div class="detail-panel" id="detailPanel">
+        <button class="detail-close" onclick="closeDetail()">✕</button>
+        <div class="detail-header">
+          <div class="detail-bus-icon">🚌</div>
+          <div>
+            <div class="detail-bus-name" id="detailName">-</div>
+            <div class="detail-bus-route" id="detailRoute">-</div>
+          </div>
+        </div>
+        <div class="detail-grid" id="detailGrid"></div>
+        <div id="detailStops"></div>
+        <div id="detailLocation"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <script src="../shared/config.js"></script>
+  <script>
+    // Auth check
+    const user = BT_Storage.get('user');
+    const token = BT_Storage.get('token');
+    if (!token || BT_Storage.get('role') !== 'user') window.location.href = 'login.html';
+
+    document.getElementById('userName').textContent = user?.name || 'Passenger';
+    document.getElementById('userAvatar').textContent = user?.avatar || 'U';
+
+    // Map setup
+    const map = L.map('map').setView(BUSTRACK_CONFIG.DEFAULT_CENTER, BUSTRACK_CONFIG.DEFAULT_ZOOM);
+    L.tileLayer(BUSTRACK_CONFIG.MAP_TILE, { attribution: BUSTRACK_CONFIG.MAP_ATTRIBUTION }).addTo(map);
+
+    const busMarkers = new Map();
+    let selectedBusId = null;
+    let followMode = false;
+    let allBuses = [];
+
+    function createBusIcon(isActive) {
+      return L.divIcon({
+        className: '',
+        html: `<div style="
+          background: ${isActive ? '#00d4ff' : '#6b7c99'};
+          width: 36px; height: 36px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 18px; border: 3px solid ${isActive ? '#fff' : '#444'};
+          box-shadow: 0 4px 12px rgba(0,0,0,0.4)${isActive ? ', 0 0 20px rgba(0,212,255,0.5)' : ''};
+          transition: all 0.3s;
+        ">🚌</div>`,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18]
+      });
+    }
+
+    function updateMarker(bus) {
+      if (!bus.location) return;
+      const { lat, lng } = bus.location;
+      
+      if (busMarkers.has(bus.id)) {
+        const marker = busMarkers.get(bus.id);
+        marker.setLatLng([lat, lng]);
+        marker.setIcon(createBusIcon(bus.isActive));
+      } else {
+        const marker = L.marker([lat, lng], { icon: createBusIcon(bus.isActive) })
+          .addTo(map)
+          .on('click', () => selectBus(bus.id));
+        busMarkers.set(bus.id, marker);
+      }
+
+      if (followMode && selectedBusId === bus.id) {
+        map.panTo([lat, lng], { animate: true, duration: 1 });
+      }
+    }
+
+    function removeMarker(busId) {
+      if (busMarkers.has(busId)) {
+        map.removeLayer(busMarkers.get(busId));
+        busMarkers.delete(busId);
+      }
+    }
+
+    // Fetch all buses
+    async function fetchBuses() {
+      try {
+        const buses = await btFetch('/buses');
+        allBuses = buses;
+        renderBusList(buses);
+        buses.forEach(bus => {
+          if (bus.isActive && bus.location) updateMarker(bus);
+        });
+      } catch (e) {
+        console.error('Failed to fetch buses:', e);
+      }
+    }
+
+    function renderBusList(buses) {
+      const list = document.getElementById('busList');
+      if (!buses.length) {
+        list.innerHTML = '<div class="empty-state"><div class="icon">🚌</div><p>No buses registered</p></div>';
+        return;
+      }
+      list.innerHTML = buses.map(bus => `
+        <div class="bus-item ${selectedBusId === bus.id ? 'selected' : ''}" onclick="selectBus('${bus.id}')">
+          <div class="bus-top">
+            <div class="bus-id">${bus.id}</div>
+            <div class="status-dot">
+              <div class="dot ${bus.isActive ? 'live' : 'offline'}"></div>
+              <span style="color:${bus.isActive ? 'var(--green)' : 'var(--muted)'}">${bus.isActive ? 'LIVE' : 'OFFLINE'}</span>
+            </div>
+          </div>
+          <div class="bus-route">${bus.route}</div>
+          <div class="bus-driver">👤 ${bus.driverName}</div>
+          <div class="bus-number">${bus.number}</div>
+        </div>
+      `).join('');
+    }
+
+    function filterBuses() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = allBuses.filter(b =>
+        b.id.toLowerCase().includes(q) ||
+        b.route.toLowerCase().includes(q) ||
+        b.driverName.toLowerCase().includes(q)
+      );
+      renderBusList(filtered);
+    }
+
+    function selectBus(busId) {
+      selectedBusId = busId;
+      const bus = allBuses.find(b => b.id === busId);
+      if (!bus) return;
+
+      renderBusList(allBuses);
+      document.getElementById('mapBusName').textContent = bus.id + ' — ' + bus.number;
+      document.getElementById('mapBusRoute').textContent = bus.route;
+
+      showDetail(bus);
+
+      if (bus.location) {
+        map.flyTo([bus.location.lat, bus.location.lng], 15, { animate: true, duration: 1.5 });
+      }
+    }
+
+    function showDetail(bus) {
+      document.getElementById('detailName').textContent = bus.id + ' — ' + bus.number;
+      document.getElementById('detailRoute').textContent = bus.route;
+
+      document.getElementById('detailGrid').innerHTML = `
+        <div class="detail-item">
+          <div class="detail-label">Status</div>
+          <div class="detail-value" style="color:${bus.isActive ? 'var(--green)' : 'var(--muted)'}">
+            ${bus.isActive ? '🟢 Live' : '⚫ Offline'}
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Driver</div>
+          <div class="detail-value">${bus.driverName}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Phone</div>
+          <div class="detail-value">${bus.driverPhone || '—'}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Capacity</div>
+          <div class="detail-value">${bus.capacity} seats</div>
+        </div>
+      `;
+
+      if (bus.stops?.length) {
+        document.getElementById('detailStops').innerHTML = `
+          <div class="stops-list">
+            <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">Route Stops</div>
+            ${bus.stops.map((stop, i) => `
+              <div class="stop-item">
+                <div class="stop-dot ${i === 0 ? 'first' : i === bus.stops.length-1 ? 'last' : ''}"></div>
+                ${stop}
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else {
+        document.getElementById('detailStops').innerHTML = '';
+      }
+
+      if (!bus.isActive || !bus.location) {
+        document.getElementById('detailLocation').innerHTML = `<div class="no-location">⚠️ This bus is currently offline</div>`;
+      } else {
+        document.getElementById('detailLocation').innerHTML = `
+          <div class="detail-item" style="margin-top:10px;">
+            <div class="detail-label">Last Location</div>
+            <div class="detail-value" style="font-size:12px;">${bus.location.lat.toFixed(5)}, ${bus.location.lng.toFixed(5)}</div>
+          </div>
+        `;
+      }
+
+      document.getElementById('detailPanel').classList.add('show');
+    }
+
+    function closeDetail() {
+      document.getElementById('detailPanel').classList.remove('show');
+      selectedBusId = null;
+      renderBusList(allBuses);
+      document.getElementById('mapBusName').textContent = 'All Active Buses';
+      document.getElementById('mapBusRoute').textContent = 'Select a bus to track';
+    }
+
+    function recenter() {
+      if (selectedBusId) {
+        const bus = allBuses.find(b => b.id === selectedBusId);
+        if (bus?.location) { map.flyTo([bus.location.lat, bus.location.lng], 15); return; }
+      }
+      map.flyTo(BUSTRACK_CONFIG.DEFAULT_CENTER, BUSTRACK_CONFIG.DEFAULT_ZOOM);
+    }
+
+    function toggleFollow() {
+      followMode = !followMode;
+      document.getElementById('followBtn').classList.toggle('active', followMode);
+      document.getElementById('followBtn').textContent = followMode ? '🔴 Following' : '👁️ Follow';
+    }
+
+    async function trackByPhone() {
+      const phone = document.getElementById('phoneInput').value.trim();
+      if (!phone) return;
+      try {
+        const data = await btFetch('/track/' + phone);
+        if (data.location) {
+          map.flyTo([data.location.lat, data.location.lng], 15);
+          updateMarker({ id: data.busId, isActive: data.isActive, location: data.location, ...data });
+        }
+        alert(`Bus: ${data.busId}\nDriver: ${data.driverName}\nRoute: ${data.route}\nStatus: ${data.isActive ? '🟢 Live' : '⚫ Offline'}`);
+      } catch (e) {
+        alert('Driver not found: ' + e.message);
+      }
+    }
+
+    // Socket.IO
+    const socket = io(BUSTRACK_CONFIG.SOCKET_URL);
+
+    socket.on('bus:location', ({ busId, driverId, driverName, location, lastUpdated }) => {
+      const bus = allBuses.find(b => b.id === busId);
+      if (bus) {
+        bus.location = location;
+        bus.isActive = true;
+        bus.lastUpdated = lastUpdated;
+        updateMarker(bus);
+        if (selectedBusId === busId) showDetail(bus);
+        renderBusList(allBuses);
+      }
+    });
+
+    socket.on('bus:status', ({ busId, status, driverName }) => {
+      const bus = allBuses.find(b => b.id === busId);
+      if (bus) {
+        bus.isActive = status === 'active';
+        if (!bus.isActive) removeMarker(busId);
+        renderBusList(allBuses);
+      }
+    });
+
+    function logout() {
+      BT_Storage.clear();
+      window.location.href = 'login.html';
+    }
+
+    // Init
+    fetchBuses();
+    setInterval(fetchBuses, 10000);
+  </script>
+</body>
+</html>

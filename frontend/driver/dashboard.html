@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Driver Dashboard — BusTrack</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0812; --surface: #110f1e; --card: #17152a; --border: #2a2445;
+      --accent: #7c3aed; --accent2: #a855f7; --text: #e8eef8; --muted: #8b7caa;
+      --green: #10b981; --red: #ef4444; --amber: #f59e0b; --blue: #3b82f6;
+    }
+    html, body { height: 100%; overflow: hidden; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; flex-direction: column; }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; height: 58px; flex-shrink: 0; z-index: 200;
+    }
+    .logo { font-family: 'Syne', sans-serif; font-size: 19px; font-weight: 800; display: flex; align-items: center; gap: 9px; text-decoration: none; color: var(--text); }
+    .logo span { color: var(--accent2); }
+    .logo-icon { width: 30px; height: 30px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+    .driver-chip { font-size: 10px; font-weight: 700; color: var(--accent2); background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.25); padding: 3px 9px; border-radius: 100px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .btn-logout { background: none; border: 1px solid var(--border); color: var(--muted); padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: 'Inter', sans-serif; transition: all 0.2s; }
+    .btn-logout:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── LAYOUT ── */
+    .layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── SIDE PANEL ── */
+    .panel {
+      width: 315px; background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; flex-shrink: 0;
+      overflow-y: auto; padding: 14px;
+    }
+    .panel::-webkit-scrollbar { width: 3px; }
+    .panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── LIVE BANNER ── */
+    .live-banner {
+      display: none; align-items: center; justify-content: center; gap: 8px;
+      background: linear-gradient(135deg, rgba(16,185,129,0.14), rgba(16,185,129,0.04));
+      border: 1px solid rgba(16,185,129,0.3); border-radius: 10px;
+      padding: 9px 14px; margin-bottom: 12px;
+      font-size: 11px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 0.1em;
+    }
+    .live-banner.show { display: flex; }
+    .live-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0;
+      animation: livePulse 1.2s infinite; }
+    @keyframes livePulse {
+      0%,100% { transform:scale(1); box-shadow:0 0 0 0 rgba(16,185,129,0.6); }
+      50% { transform:scale(1.3); box-shadow:0 0 0 7px rgba(16,185,129,0); }
+    }
+
+    /* ── CONNECTION BAR ── */
+    .conn-bar {
+      display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+      border-radius: 8px; font-size: 12px; font-weight: 500; margin-bottom: 10px;
+      background: var(--card); border: 1px solid var(--border);
+    }
+    .conn-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .conn-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .conn-dot.reconnecting { background: var(--amber); animation: blinkAmber 0.9s infinite; }
+    .conn-dot.offline { background: var(--muted); }
+    @keyframes blinkAmber { 0%,100%{opacity:1}50%{opacity:0.25} }
+
+    /* ── STATUS CARD ── */
+    .status-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 13px;
+      padding: 16px; margin-bottom: 12px; text-align: center;
+      transition: border-color 0.4s, box-shadow 0.4s;
+    }
+    .status-card.active {
+      border-color: rgba(16,185,129,0.4);
+      box-shadow: 0 0 30px rgba(16,185,129,0.08);
+    }
+    .status-icon { font-size: 42px; margin-bottom: 9px; display: block; }
+    .status-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 4px; }
+    .status-text { font-family: 'Syne', sans-serif; font-size: 19px; font-weight: 800; margin-bottom: 4px; }
+    .status-text.online { color: var(--green); }
+    .status-text.offline { color: var(--muted); }
+    .status-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    /* ── SESSION DURATION ── */
+    .duration-row {
+      display: none; align-items: center; justify-content: space-between;
+      background: rgba(124,58,237,0.07); border: 1px solid rgba(124,58,237,0.18);
+      border-radius: 9px; padding: 9px 13px; margin-bottom: 10px;
+    }
+    .duration-row.show { display: flex; }
+    .dur-label { font-size: 11px; color: var(--muted); }
+    .dur-value { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; color: var(--accent2); }
+
+    /* ── START BUTTON ── */
+    .start-btn {
+      width: 100%; padding: 17px; border-radius: 13px; border: none;
+      background: linear-gradient(135deg, var(--green), #059669);
+      color: #fff; font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800;
+      cursor: pointer; transition: all 0.25s; display: flex; align-items: center; justify-content: center; gap: 9px;
+      margin-bottom: 10px;
+    }
+    .start-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(16,185,129,0.38); }
+    .start-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    /* ── LOCKED INDICATOR (replaces stop button) ── */
+    .locked-indicator {
+      display: none; width: 100%; padding: 14px; border-radius: 13px;
+      background: linear-gradient(135deg, rgba(16,185,129,0.06), rgba(16,185,129,0.02));
+      border: 2px solid rgba(16,185,129,0.25); color: var(--green);
+      font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+      align-items: center; justify-content: center; gap: 8px;
+      margin-bottom: 10px; text-align: center;
+    }
+    .locked-indicator.show { display: flex; }
+
+    /* ── ARRIVE BUTTON ── */
+    .arrive-section { display: none; margin-bottom: 12px; }
+    .arrive-section.show { display: block; }
+    .arrive-btn {
+      width: 100%; padding: 14px; border-radius: 12px;
+      border: 2px solid rgba(239,68,68,0.4); background: rgba(239,68,68,0.07);
+      color: #f87171; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800;
+      cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .arrive-btn:hover { background: rgba(239,68,68,0.14); border-color: var(--red); color: var(--red); transform: translateY(-1px); }
+    .arrive-hint {
+      margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.6; text-align: center;
+      background: rgba(0,0,0,0.2); border-radius: 8px; padding: 8px 10px;
+    }
+    .arrive-hint strong { color: var(--text); }
+
+    /* ── INFO ROWS ── */
+    .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 12px 0 7px; }
+    .info-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 9px 12px; margin-bottom: 5px;
+    }
+    .info-label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+    .info-value { font-size: 13px; font-weight: 600; text-align: right; max-width: 165px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── COORDS ── */
+    .coords-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 12px; }
+    .coord-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; }
+    .coord-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 3px; }
+    .coord-value { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: var(--accent2); }
+
+    /* ── LOG ── */
+    .log-box {
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 9px 11px; max-height: 130px; overflow-y: auto;
+    }
+    .log-box::-webkit-scrollbar { width: 2px; }
+    .log-box::-webkit-scrollbar-thumb { background: var(--border); }
+    .log-entry { font-size: 10.5px; color: var(--muted); padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); display: flex; gap: 7px; }
+    .log-entry:last-child { border-bottom: none; }
+    .log-time { color: var(--accent2); flex-shrink: 0; font-weight: 600; font-size: 10px; }
+
+    /* ── MAP ── */
+    .map-area { flex: 1; position: relative; overflow: hidden; }
+    #map { width: 100%; height: 100%; }
+
+    /* ── MAP OVERLAYS ── */
+    .map-badge {
+      position: absolute; z-index: 400; background: var(--card);
+      border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px;
+      font-size: 12px; display: none; align-items: center; gap: 6px;
+    }
+    .map-badge.show { display: flex; }
+    #updateBadge { top: 12px; right: 12px; font-family: 'Syne', sans-serif; font-weight: 700; }
+    #accBadge { bottom: 12px; left: 12px; }
+    #wakelockBadge { bottom: 12px; right: 12px; font-size: 11px; color: var(--muted); }
+    .upd-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: livePulse 1.5s infinite; }
+    .acc-indicator { width: 8px; height: 8px; border-radius: 50%; }
+    .acc-good { background: var(--green); }
+    .acc-ok { background: var(--amber); }
+    .acc-poor { background: var(--red); }
+
+    /* Reconnect banner over map */
+    .map-reconnect {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(245,158,11,0.14); border: 1px solid rgba(245,158,11,0.4);
+      color: var(--amber); border-radius: 10px; padding: 9px 18px;
+      font-size: 12px; font-weight: 600; z-index: 500; display: none;
+      gap: 8px; align-items: center; white-space: nowrap;
+    }
+    .map-reconnect.show { display: flex; }
+
+    /* ── MODALS ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+      display: none; align-items: center; justify-content: center; z-index: 9999;
+      backdrop-filter: blur(5px); padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+      padding: 30px 28px; max-width: 360px; width: 100%; text-align: center;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.7);
+      animation: modalPop 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes modalPop { from { opacity:0; transform:scale(0.82) translateY(20px); } to { opacity:1; transform:scale(1) translateY(0); } }
+    .modal-icon { font-size: 50px; margin-bottom: 14px; display: block; }
+    .modal h3 { font-family: 'Syne', sans-serif; font-size: 21px; font-weight: 800; margin-bottom: 8px; }
+    .modal p { font-size: 13.5px; color: var(--muted); line-height: 1.65; margin-bottom: 22px; }
+    .modal p strong { color: var(--text); }
+    .modal-btns { display: flex; gap: 10px; }
+    .mbtn {
+      flex: 1; padding: 13px; border-radius: 10px; border: none;
+      font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+    }
+    .mbtn.cancel { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+    .mbtn.cancel:hover { color: var(--text); }
+    .mbtn.danger { background: linear-gradient(135deg, var(--red), #dc2626); color: #fff; }
+    .mbtn.danger:hover { box-shadow: 0 6px 20px rgba(239,68,68,0.4); transform: translateY(-1px); }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      padding: 11px 22px; border-radius: 9px; font-size: 13px; font-weight: 500;
+      z-index: 9998; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+      white-space: nowrap; max-width: 92vw; text-align: center;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--green); color: #fff; }
+    .toast.error { background: var(--red); color: #fff; }
+    .toast.warn { background: var(--amber); color: #000; font-weight: 700; }
+    .toast.info { background: var(--blue); color: #fff; }
+
+    /* Mobile */
+    @media (max-width: 680px) {
+      .panel { width: 100%; position: absolute; bottom: 0; left: 0; right: 0; top: auto; max-height: 56vh; z-index: 300; border-right: none; border-top: 2px solid var(--border); border-radius: 18px 18px 0 0; padding: 12px; }
+      .map-area { height: 44vh; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <a href="../index.html" class="logo"><div class="logo-icon">🚌</div>Bus<span>Track</span></a>
+    <div class="driver-chip">Driver</div>
+  </div>
+  <div class="topbar-right">
+    <div class="avatar" id="driverAvatar">D</div>
+    <button class="btn-logout" onclick="attemptLogout()">Logout</button>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- PANEL -->
+  <div class="panel">
+
+    <!-- Live broadcasting banner -->
+    <div class="live-banner" id="liveBanner">
+      <div class="live-pulse"></div>
+      Broadcasting Live Location
+    </div>
+
+    <!-- Connection bar -->
+    <div class="conn-bar" id="connBar">
+      <div class="conn-dot offline" id="connDot"></div>
+      <span id="connText">Not connected</span>
+    </div>
+
+    <!-- Status card -->
+    <div class="status-card" id="statusCard">
+      <span class="status-icon" id="statusIcon">🚌</span>
+      <div class="status-label">Tracking Status</div>
+      <div class="status-text offline" id="statusText">OFFLINE</div>
+      <div class="status-sub" id="statusSub">Press Start to begin sharing your live GPS location with passengers</div>
+    </div>
+
+    <!-- Duration (only when tracking) -->
+    <div class="duration-row" id="durationRow">
+      <span class="dur-label">🕐 Session Duration</span>
+      <span class="dur-value" id="durationVal">00:00:00</span>
+    </div>
+
+    <!-- START button -->
+    <button class="start-btn" id="startBtn" onclick="startTracking()">
+      ▶&nbsp; Start Sharing Location
+    </button>
+
+    <!-- Lock indicator (when active) -->
+    <div class="locked-indicator" id="lockedIndicator">
+      🔒&nbsp; Sharing is Active — Cannot Stop Manually
+    </div>
+
+    <!-- Arrive / stop section -->
+    <div class="arrive-section" id="arriveSection">
+      <button class="arrive-btn" onclick="showArriveConfirm()">
+        🏁&nbsp; I Have Reached Destination
+      </button>
+      <div class="arrive-hint">
+        Location sharing <strong>only stops</strong> when you confirm arrival.<br>
+        Closing the app, switching tabs, or losing signal will <strong>not</strong> end your broadcast.
+      </div>
+    </div>
+
+    <!-- Bus info -->
+    <div class="section-title">Bus Information</div>
+    <div class="info-row"><span class="info-label">🚌 Bus ID</span><span class="info-value" id="infoBusId">—</span></div>
+    <div class="info-row"><span class="info-label">🗺️ Route</span><span class="info-value" id="infoRoute">—</span></div>
+    <div class="info-row"><span class="info-label">📱 Phone</span><span class="info-value" id="infoPhone">—</span></div>
+
+    <!-- GPS coordinates -->
+    <div class="section-title">Live GPS Data</div>
+    <div class="coords-grid">
+      <div class="coord-box"><div class="coord-label">Latitude</div><div class="coord-value" id="coordLat">—</div></div>
+      <div class="coord-box"><div class="coord-label">Longitude</div><div class="coord-value" id="coordLng">—</div></div>
+      <div class="coord-box"><div class="coord-label">Speed</div><div class="coord-value" id="coordSpeed">—</div></div>
+      <div class="coord-box"><div class="coord-label">Accuracy</div><div class="coord-value" id="coordAcc">—</div></div>
+    </div>
+
+    <!-- Update log -->
+    <div class="section-title">Update Log</div>
+    <div class="log-box" id="logBox">
+      <div class="log-entry"><span class="log-time">—</span><span>Waiting to start...</span></div>
+    </div>
+
+  </div>
+
+  <!-- MAP -->
+  <div class="map-area">
+    <div id="map"></div>
+
+    <!-- Reconnecting banner on map -->
+    <div class="map-reconnect" id="mapReconnect">
+      ⚡ Reconnecting — location still being tracked locally
+    </div>
+
+    <!-- Update counter -->
+    <div class="map-badge" id="updateBadge">
+      <div class="upd-dot"></div>
+      <span id="updateCount">0</span>&nbsp;updates sent
+    </div>
+
+    <!-- Accuracy badge -->
+    <div class="map-badge" id="accBadge">
+      <div class="acc-indicator acc-good" id="accDot"></div>
+      <span id="accText">GPS: Good</span>
+    </div>
+
+    <!-- Wake lock badge -->
+    <div class="map-badge" id="wakelockBadge">
+      ☀️ Screen kept awake
+    </div>
+  </div>
+
+</div>
+
+<!-- ARRIVE CONFIRM MODAL -->
+<div class="modal-overlay" id="arriveModal">
+  <div class="modal">
+    <span class="modal-icon">🏁</span>
+    <h3>Confirm Arrival</h3>
+    <p>
+      Have you reached the <strong>final destination</strong>?<br><br>
+      This will <strong>permanently stop</strong> your live location broadcast and mark the trip as complete for all passengers.
+    </p>
+    <div class="modal-btns">
+      <button class="mbtn cancel" onclick="closeModal('arriveModal')">Not Yet</button>
+      <button class="mbtn danger" onclick="confirmArrival()">✅ Yes, Trip Complete</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGOUT GUARD MODAL -->
+<div class="modal-overlay" id="logoutModal">
+  <div class="modal">
+    <span class="modal-icon">⚠️</span>
+    <h3>Still Broadcasting!</h3>
+    <p>
+      You are actively sharing your location.<br><br>
+      Logging out <strong>will not stop tracking</strong> — passengers will still see your bus until you confirm arrival.<br><br>
+      Use <em style="color:var(--accent2)">"I Have Reached Destination"</em> to properly end the trip.
+    </p>
+    <div class="modal-btns">
+      <button class="mbtn cancel" onclick="closeModal('logoutModal')">Stay</button>
+      <button class="mbtn danger" onclick="forceLogout()">Logout Anyway</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+<script src="../shared/config.js"></script>
+<script>
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+const driverData = BT_Storage.get('driver');
+const token = BT_Storage.get('token');
+if (!token || BT_Storage.get('role') !== 'driver') window.location.href = 'login.html';
+
+document.getElementById('driverAvatar').textContent = driverData?.avatar || 'D';
+document.getElementById('infoBusId').textContent  = driverData?.busId  || '—';
+document.getElementById('infoRoute').textContent   = driverData?.route  || '—';
+document.getElementById('infoPhone').textContent   = driverData?.phone  || '—';
+
+// ─── MAP SETUP ────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView(BUSTRACK_CONFIG.DEFAULT_CENTER, 14);
+L.tileLayer(BUSTRACK_CONFIG.MAP_TILE, { attribution: BUSTRACK_CONFIG.MAP_ATTRIBUTION }).addTo(map);
+
+let busMarker = null, accCircle = null, trailLine = null;
+const trailPts = [];
+
+function driverIcon() {
+  return L.divIcon({
+    className: '',
+    html: `<div style="background:linear-gradient(135deg,#7c3aed,#a855f7);width:46px;height:46px;
+           border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;
+           border:3px solid #fff;box-shadow:0 4px 18px rgba(0,0,0,.5),0 0 28px rgba(124,58,237,.6);">🚌</div>`,
+    iconSize: [46,46], iconAnchor: [23,23]
+  });
+}
+
+function placeMarker(lat, lng, acc) {
+  if (busMarker) busMarker.setLatLng([lat, lng]);
+  else busMarker = L.marker([lat, lng], { icon: driverIcon() }).addTo(map).bindPopup('📍 Your position');
+  if (accCircle) accCircle.setLatLng([lat, lng]).setRadius(acc);
+  else accCircle = L.circle([lat, lng], { radius: acc, color:'#a855f7', fillColor:'#7c3aed', fillOpacity:.08, weight:1 }).addTo(map);
+  trailPts.push([lat, lng]);
+  if (trailPts.length > 100) trailPts.shift();
+  if (trailLine) map.removeLayer(trailLine);
+  if (trailPts.length > 1)
+    trailLine = L.polyline(trailPts, { color:'#a855f7', weight:3, opacity:.4, dashArray:'5,5' }).addTo(map);
+  map.panTo([lat, lng], { animate:true, duration:.6 });
+}
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let isTracking     = false;
+let geoWatchId     = null;
+let simInterval    = null;
+let socket         = null;
+let wakeLock       = null;
+let sessionStart   = null;
+let durationTick   = null;
+let updateCount    = 0;
+let lastLoc        = null;
+let socketAlive    = false;
+
+// Simulated GPS base coords
+let simLat = BUSTRACK_CONFIG.DEFAULT_CENTER[0];
+let simLng = BUSTRACK_CONFIG.DEFAULT_CENTER[1];
+
+// ─── SESSION PERSISTENCE ──────────────────────────────────────────────────────
+// Survives page refresh / accidental back (not tab close — intentional UX)
+function saveSession() {
+  sessionStorage.setItem('btDriver', JSON.stringify({ isTracking, sessionStart }));
+}
+function clearSession() {
+  sessionStorage.removeItem('btDriver');
+}
+(function restoreSession() {
+  try {
+    const s = JSON.parse(sessionStorage.getItem('btDriver') || 'null');
+    if (s?.isTracking) {
+      addLog('🔄 Restoring previous session...');
+      setTimeout(() => startTracking(s.sessionStart), 400);
+    }
+  } catch {}
+})();
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function addLog(msg) {
+  const box = document.getElementById('logBox');
+  const now = new Date().toLocaleTimeString('en-IN', { hour12:false });
+  const el  = document.createElement('div');
+  el.className = 'log-entry';
+  el.innerHTML = `<span class="log-time">${now}</span><span>${msg}</span>`;
+  box.insertBefore(el, box.firstChild);
+  if (box.children.length > 35) box.removeChild(box.lastChild);
+}
+
+let toastTimer;
+function showToast(msg, type = 'success', dur = 3500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type + ' show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function setConn(state) {
+  // state: 'connected' | 'reconnecting' | 'offline'
+  socketAlive = state === 'connected';
+  const dot  = document.getElementById('connDot');
+  const text = document.getElementById('connText');
+  dot.className = 'conn-dot ' + state;
+  const labels = { connected:'🟢 Connected to server', reconnecting:'🟡 Reconnecting...', offline:'⚫ Not connected' };
+  text.textContent = labels[state] || state;
+  const showReconn = state === 'reconnecting' && isTracking;
+  document.getElementById('mapReconnect').classList.toggle('show', showReconn);
+}
+
+function setUI(active, sub) {
+  document.getElementById('statusCard').classList.toggle('active', active);
+  document.getElementById('statusIcon').textContent = active ? '📡' : '🚌';
+  const st = document.getElementById('statusText');
+  st.textContent  = active ? 'SHARING LIVE' : 'OFFLINE';
+  st.className    = 'status-text ' + (active ? 'online' : 'offline');
+  document.getElementById('statusSub').textContent = sub || (active
+    ? 'Broadcasting your GPS location to passengers'
+    : 'Press Start to begin sharing your live GPS');
+
+  document.getElementById('liveBanner').classList.toggle('show', active);
+  document.getElementById('startBtn').style.display      = active ? 'none' : 'flex';
+  document.getElementById('lockedIndicator').classList.toggle('show', active);
+  document.getElementById('arriveSection').classList.toggle('show', active);
+  document.getElementById('durationRow').classList.toggle('show', active);
+  document.getElementById('updateBadge').classList.toggle('show', active);
+  document.getElementById('accBadge').classList.toggle('show', active);
+}
+
+function startDuration(fromMs) {
+  const start = fromMs || Date.now();
+  sessionStart = start;
+  clearInterval(durationTick);
+  durationTick = setInterval(() => {
+    const s  = Math.floor((Date.now() - start) / 1000);
+    const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+    const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    document.getElementById('durationVal').textContent = `${hh}:${mm}:${ss}`;
+  }, 1000);
+}
+
+// ─── WAKE LOCK ────────────────────────────────────────────────────────────────
+async function grabWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      document.getElementById('wakelockBadge').classList.add('show');
+      wakeLock.addEventListener('release', () => {
+        document.getElementById('wakelockBadge').classList.remove('show');
+        if (isTracking) setTimeout(grabWakeLock, 800); // auto re-acquire
+      });
+      addLog('☀️ Screen wake lock active — display won\'t sleep');
+    }
+  } catch(e) { addLog('⚠️ Wake lock unavailable (' + e.message + ')'); }
+}
+
+function dropWakeLock() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  document.getElementById('wakelockBadge').classList.remove('show');
+}
+
+// Re-acquire wake lock when driver returns to the tab
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && isTracking) {
+    if (!wakeLock) grabWakeLock();
+    addLog('👁️ Tab re-focused');
+  }
+});
+
+// ─── SOCKET ───────────────────────────────────────────────────────────────────
+function buildSocket() {
+  if (socket) { socket.disconnect(); socket = null; }
+
+  socket = io(BUSTRACK_CONFIG.SOCKET_URL, {
+    reconnection: true,
+    reconnectionAttempts: Infinity,   // ← NEVER give up reconnecting
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    timeout: 15000
+  });
+
+  socket.on('connect', () => {
+    setConn('connected');
+    addLog('🔌 Socket connected');
+    // Re-announce as active driver after every reconnect
+    socket.emit('driver:start', { driverId: driverData.id, token });
+    // Immediately push last known coords so server has fresh data
+    if (lastLoc && isTracking) emitLocation(lastLoc);
+  });
+
+  socket.on('disconnect', reason => {
+    setConn('reconnecting');
+    addLog('⚡ Disconnected (' + reason + ') — reconnecting...');
+    if (isTracking) showToast('⚡ Signal lost — reconnecting (still tracking!)', 'warn', 6000);
+  });
+
+  socket.on('connect_error', () => setConn('reconnecting'));
+
+  socket.on('reconnect', n => {
+    addLog('✅ Reconnected after ' + n + ' attempt(s)');
+    showToast('✅ Reconnected to server', 'success');
+  });
+}
+
+// ─── EMIT ─────────────────────────────────────────────────────────────────────
+function emitLocation(loc) {
+  if (!socket?.connected) return;
+  socket.emit('driver:location', { driverId: driverData.id, token, location: loc });
+}
+
+// ─── PROCESS GPS FIX ─────────────────────────────────────────────────────────
+function onLocation(lat, lng, acc, spd, hdg) {
+  if (!isTracking) return;
+  const loc = { lat, lng, accuracy: acc, speed: spd || 0, heading: hdg || 0 };
+  lastLoc = loc;
+
+  // Update UI
+  document.getElementById('coordLat').textContent   = lat.toFixed(6);
+  document.getElementById('coordLng').textContent   = lng.toFixed(6);
+  document.getElementById('coordSpeed').textContent = spd ? (spd * 3.6).toFixed(1) + ' km/h' : '0 km/h';
+  document.getElementById('coordAcc').textContent   = acc.toFixed(0) + 'm';
+
+  const accDot  = document.getElementById('accDot');
+  const accTxt  = document.getElementById('accText');
+  if (acc < 20)      { accDot.className = 'acc-indicator acc-good'; accTxt.textContent = 'GPS: Excellent'; }
+  else if (acc < 60) { accDot.className = 'acc-indicator acc-ok';   accTxt.textContent = 'GPS: Good'; }
+  else               { accDot.className = 'acc-indicator acc-poor';  accTxt.textContent = 'GPS: Weak'; }
+
+  placeMarker(lat, lng, acc);
+  emitLocation(loc);
+
+  updateCount++;
+  document.getElementById('updateCount').textContent = updateCount;
+  addLog(`📍 ${lat.toFixed(5)},${lng.toFixed(5)} ±${acc.toFixed(0)}m`);
+  saveSession();
+}
+
+// ─── REAL GPS ─────────────────────────────────────────────────────────────────
+function startGPS() {
+  if (!navigator.geolocation) { startSim(); return; }
+  geoWatchId = navigator.geolocation.watchPosition(
+    pos => onLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed, pos.coords.heading),
+    err => {
+      addLog('⚠️ GPS error code ' + err.code + ': ' + err.message);
+      showToast('GPS unavailable — demo simulation active', 'warn', 5000);
+      startSim();
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+  );
+}
+
+// ─── SIMULATION (demo / GPS unavailable) ─────────────────────────────────────
+function startSim() {
+  if (simInterval) return;
+  addLog('🎮 Demo simulation active (real GPS unavailable)');
+  simInterval = setInterval(() => {
+    if (!isTracking) { clearInterval(simInterval); simInterval = null; return; }
+    simLat += (Math.random() - 0.48) * 0.0007;
+    simLng += (Math.random() - 0.48) * 0.0007;
+    onLocation(simLat, simLng, 8 + Math.random() * 5, Math.random() * 12, 0);
+  }, 2000);
+}
+
+// ─── START TRACKING ───────────────────────────────────────────────────────────
+function startTracking(resumeFrom) {
+  isTracking = true;
+  setUI(true);
+  setConn('reconnecting');
+  addLog('🚀 Starting location broadcast...');
+  showToast('🟢 Tracking started! Passengers can now see your bus.', 'success', 6000);
+  grabWakeLock();
+  buildSocket();
+  startGPS();
+  startDuration(resumeFrom);
+  saveSession();
+}
+
+// ─── STOP TRACKING — only called after explicit arrival confirmation ──────────
+function stopTracking() {
+  isTracking = false;
+
+  if (geoWatchId !== null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId = null; }
+  if (simInterval)          { clearInterval(simInterval); simInterval = null; }
+  if (socket) {
+    socket.emit('driver:stop', { driverId: driverData.id });
+    socket.disconnect(); socket = null;
+  }
+  clearInterval(durationTick);
+  dropWakeLock();
+  clearSession();
+  lastLoc = null; updateCount = 0;
+
+  setUI(false);
+  setConn('offline');
+  document.getElementById('connText').textContent = 'Not connected';
+  document.getElementById('mapReconnect').classList.remove('show');
+  addLog('🏁 Trip complete — location sharing ended');
+  showToast('🏁 Trip complete! Location sharing stopped.', 'success', 7000);
+}
+
+// ─── ARRIVAL FLOW ─────────────────────────────────────────────────────────────
+function showArriveConfirm() { document.getElementById('arriveModal').classList.add('show'); }
+function confirmArrival()    { closeModal('arriveModal'); stopTracking(); }
+
+// ─── LOGOUT GUARD ─────────────────────────────────────────────────────────────
+function attemptLogout() {
+  if (isTracking) document.getElementById('logoutModal').classList.add('show');
+  else doLogout();
+}
+function forceLogout() { closeModal('logoutModal'); doLogout(); }
+function doLogout()    { BT_Storage.clear(); window.location.href = 'login.html'; }
+
+// ─── GENERIC MODAL CLOSE ─────────────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ─── BLOCK ACCIDENTAL NAVIGATION ─────────────────────────────────────────────
+// Shows browser's "Leave site?" prompt when tracking is active
+window.addEventListener('beforeunload', e => {
+  if (!isTracking) return;
+  const msg = 'You are sharing your live location. Leaving will NOT stop tracking. Use "I Have Reached Destination" to properly end the trip.';
+  e.preventDefault();
+  e.returnValue = msg;
+  return msg;
+});
+
+// Intercept Android/mobile back button
+window.history.pushState(null, '', window.location.href);
+window.addEventListener('popstate', () => {
+  if (isTracking) {
+    window.history.pushState(null, '', window.location.href);
+    showToast('🔒 Use "I Have Reached Destination" to stop tracking', 'warn', 4500);
+  }
+});
+</script>
+</body>
+</html>
