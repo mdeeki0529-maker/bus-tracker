@@ -1,7 +1,7 @@
 // BusTrack Shared Configuration
 const BUSTRACK_CONFIG = {
-  API_BASE: 'http://localhost:3001/api',
-  SOCKET_URL: 'http://localhost:3001',
+  API_BASE: 'https://bus-tracker-eptg.onrender.com/api',
+  SOCKET_URL: 'https://bus-tracker-eptg.onrender.com',
   MAP_TILE: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   MAP_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   DEFAULT_CENTER: [12.9716, 77.5946], // Bengaluru
