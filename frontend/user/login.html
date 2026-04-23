@@ -151,7 +151,7 @@
           <label>Full Name</label>
           <div class="input-wrap">
             <span class="input-icon">👤</span>
-            <input type="text" id="regName" placeholder="Your full name">
+            <input type="text" id="regName" placeholder="Your full name" pattern="[A-Za-z\s]+" title="Only letters and spaces allowed">
           </div>
         </div>
         <div class="field">
@@ -165,14 +165,14 @@
           <label>Phone Number</label>
           <div class="input-wrap">
             <span class="input-icon">📱</span>
-            <input type="tel" id="regPhone" placeholder="10-digit mobile number">
+            <input type="tel" id="regPhone" placeholder="10-digit mobile number" inputmode="numeric" maxlength="10">
           </div>
         </div>
         <div class="field">
           <label>Password</label>
           <div class="input-wrap">
             <span class="input-icon">🔒</span>
-            <input type="password" id="regPass" placeholder="Min. 6 characters">
+            <input type="password" id="regPass" placeholder="Min. 6 characters" minlength="6">
           </div>
         </div>
         <button class="btn-submit" id="regBtn" onclick="doRegister()">
@@ -190,6 +190,19 @@
     if (BT_Storage.get('token') && BT_Storage.get('role') === 'user') {
       window.location.href = 'dashboard.html';
     }
+
+    // Input validation functions
+    function onlyLettersAndSpaces(e) {
+      e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '');
+    }
+
+    function onlyNumbers(e) {
+      e.target.value = e.target.value.replace(/[^0-9]/g, '');
+    }
+
+    // Apply input validation
+    document.getElementById('regName').addEventListener('input', onlyLettersAndSpaces);
+    document.getElementById('regPhone').addEventListener('input', onlyNumbers);
 
     function switchTab(tab) {
       document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', (i === 0) === (tab === 'login')));
@@ -234,6 +247,10 @@
 
       if (!name || !email || !phone || !password)
         return showAlert('regAlert', 'Please fill in all fields', 'error');
+      if (!/^[A-Za-z\s]+$/.test(name))
+        return showAlert('regAlert', 'Name can only contain letters and spaces', 'error');
+      if (phone.length !== 10 || !/^\d+$/.test(phone))
+        return showAlert('regAlert', 'Phone number must be exactly 10 digits', 'error');
       if (password.length < 6)
         return showAlert('regAlert', 'Password must be at least 6 characters', 'error');
 

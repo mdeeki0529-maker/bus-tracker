@@ -144,14 +144,14 @@
           <label>Full Name</label>
           <div class="input-wrap">
             <span class="input-icon">👤</span>
-            <input type="text" id="regName" placeholder="Your full name">
+            <input type="text" id="regName" placeholder="Your full name" pattern="[A-Za-z\s]+" title="Only letters and spaces allowed">
           </div>
         </div>
         <div class="field">
           <label>Phone Number</label>
           <div class="input-wrap">
             <span class="input-icon">📱</span>
-            <input type="tel" id="regPhone" placeholder="10-digit phone number">
+            <input type="tel" id="regPhone" placeholder="10-digit phone number" inputmode="numeric" maxlength="10">
           </div>
         </div>
         <div class="field">
@@ -165,7 +165,7 @@
           <label>Bus Number</label>
           <div class="input-wrap">
             <span class="input-icon">🚌</span>
-            <input type="text" id="regBus" placeholder="e.g. KA-01-AB-1234">
+            <input type="text" id="regBus" placeholder="e.g. KA-01-AB-1234" pattern="[A-Z]{2}-\d{2}-[A-Z]{2}-\d{4}" title="Format: XX-##-XX-####">
           </div>
         </div>
         <div class="field">
@@ -179,7 +179,7 @@
           <label>Password</label>
           <div class="input-wrap">
             <span class="input-icon">🔒</span>
-            <input type="password" id="regPass" placeholder="Min. 6 characters">
+            <input type="password" id="regPass" placeholder="Min. 6 characters" minlength="6">
           </div>
         </div>
         <button class="btn-submit" id="regBtn" onclick="doRegister()">Register →</button>
@@ -192,6 +192,27 @@
   <script src="../shared/config.js"></script>
   <script>
     if (BT_Storage.get('token') && BT_Storage.get('role') === 'driver') window.location.href = 'dashboard.html';
+
+    // Input validation functions
+    function onlyLettersAndSpaces(e) {
+      e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '');
+    }
+
+    function onlyNumbers(e) {
+      e.target.value = e.target.value.replace(/[^0-9]/g, '');
+    }
+
+    function busNumberFormat(e) {
+      let val = e.target.value.toUpperCase();
+      val = val.replace(/[^A-Z0-9-]/g, '');
+      e.target.value = val;
+    }
+
+    // Apply input validation
+    document.getElementById('regName').addEventListener('input', onlyLettersAndSpaces);
+    document.getElementById('regPhone').addEventListener('input', onlyNumbers);
+    document.getElementById('regBus').addEventListener('input', busNumberFormat);
+    document.getElementById('loginPhone').addEventListener('input', onlyNumbers);
 
     function switchTab(tab) {
       document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', (i === 0) === (tab === 'login')));
@@ -208,6 +229,8 @@
       const phone = document.getElementById('loginPhone').value.trim();
       const password = document.getElementById('loginPass').value;
       if (!phone || !password) return showAlert('loginAlert', 'Please fill in all fields', 'error');
+      if (phone.length !== 10 || !/^\d+$/.test(phone))
+        return showAlert('loginAlert', 'Phone number must be exactly 10 digits', 'error');
 
       const btn = document.getElementById('loginBtn');
       btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Signing in...';
@@ -234,7 +257,12 @@
       const password = document.getElementById('regPass').value;
 
       if (!name || !phone || !password) return showAlert('regAlert', 'Name, phone and password are required', 'error');
-      if (password.length < 6) return showAlert('regAlert', 'Password must be at least 6 characters', 'error');
+      if (!/^[A-Za-z\s]+$/.test(name))
+        return showAlert('regAlert', 'Name can only contain letters and spaces', 'error');
+      if (phone.length !== 10 || !/^\d+$/.test(phone))
+        return showAlert('regAlert', 'Phone number must be exactly 10 digits', 'error');
+      if (password.length < 6)
+        return showAlert('regAlert', 'Password must be at least 6 characters', 'error');
 
       const btn = document.getElementById('regBtn');
       btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Registering...';

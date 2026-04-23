@@ -1,4 +1,13 @@
 {
+  "name": "bustrack",
+  "version": "1.0.0",
+  "description": "Real-time Bus Tracking System",
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ..",
+    "start": "cd backend && npm start",
+    "dev": "cd backend && npm run dev",
+    "frontend": "start http://localhost:3000/frontend/user/login.html"
+  },
   "dependencies": {
     "isomorphic-git": "^1.37.4"
   }
